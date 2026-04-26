@@ -1,0 +1,64 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: [ main ]
+
+env:
+  AWS_REGION: ap-south-1
+  ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+  IMAGE_NAME: app
+  EKS_CLUSTER: prod-eks-cluster
+
+jobs:
+  build-and-deploy:
+    name: Build, Scan and Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build Docker Image
+        run: |
+          docker build -t $ECR_REGISTRY/$IMAGE_NAME:${{ github.sha }} .
+          docker tag $ECR_REGISTRY/$IMAGE_NAME:${{ github.sha }} $ECR_REGISTRY/$IMAGE_NAME:latest
+
+      - name: Trivy Security Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.ECR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          format: sarif
+          output: trivy-results.sarif
+          severity: HIGH,CRITICAL
+
+      - name: Push to ECR
+        run: |
+          docker push $ECR_REGISTRY/$IMAGE_NAME:${{ github.sha }}
+          docker push $ECR_REGISTRY/$IMAGE_NAME:latest
+
+      - name: Deploy to EKS
+        run: |
+          aws eks update-kubeconfig \
+            --region $AWS_REGION \
+            --name $EKS_CLUSTER
+
+          kubectl set image deployment/app \
+            app=$ECR_REGISTRY/$IMAGE_NAME:${{ github.sha }}
+
+          kubectl rollout status deployment/app --timeout=5m
+
+      - name: Notify Success
+        if: success()
+        run: echo "✅ Deployment successful! SHA - ${{ github.sha }}"
