@@ -4,39 +4,12 @@ End-to-end CI/CD pipeline implementation using Jenkins and GitHub Actions for au
 
 ## 🏗️ Architecture Overview
 
-Developer Push
-│
-▼
-┌─────────────────┐
-│   GitHub Repo   │
-└────────┬────────┘
-│
-┌────┴────┐
-│         │
-▼         ▼
-GitHub      Jenkins
-Actions     Server
-(PR Check)  (EC2 t3.medium)
-│         │
-│    ┌────┴─────────────┐
-│    │ Stages:          │
-│    │ 1. Checkout      │
-│    │ 2. SonarQube     │
-│    │ 3. Docker Build  │
-│    │ 4. Trivy Scan    │
-│    │ 5. Push to ECR   │
-│    │ 6. Deploy to EKS │
-│    └────┬─────────────┘
-│         │
-▼         ▼
-┌─────────────────────┐
-│    AWS EKS Cluster  │
-│  ┌───────────────┐  │
-│  │  App Pods x2  │  │
-│  │  Rolling      │  │
-│  │  Update       │  │
-│  └───────────────┘  │
-└─────────────────────┘
+| Flow | Steps |
+|------|-------|
+| **PR Flow** | Developer → GitHub PR → GitHub Actions → SonarQube + Trivy Scan → PR Approved |
+| **Deploy Flow** | Merge to Main → Jenkins Triggered → Build → Scan → ECR Push → EKS Deploy |
+
+## 🖥️ Infrastructure Setup
 
 ## 🖥️ Infrastructure Setup
 
@@ -59,17 +32,13 @@ Code Merge → Checkout → SonarQube → Quality Gate → Docker Build → Triv
 
 ## 📁 Project Structure
 
-cicd-pipeline-demo/
-├── jenkins/
-│   └── Jenkinsfile          # Full deployment pipeline
-├── github-actions/
-│   ├── pull-request-check.yml   # PR quality gates
-│   └── build-and-deploy.yml     # Main branch deployment
-├── kubernetes/
-│   ├── deployment.yaml      # App deployment with Rolling Update
-│   └── service.yaml         # LoadBalancer service
-└── README.md
-
+| Path | Purpose |
+|------|---------|
+| `jenkins/Jenkinsfile` | Full deployment pipeline |
+| `github-actions/pull-request-check.yml` | PR quality gates |
+| `github-actions/build-and-deploy.yml` | Main branch deployment |
+| `kubernetes/deployment.yaml` | App deployment with Rolling Update |
+| `kubernetes/service.yaml` | LoadBalancer service |
 ## 🛡️ DevSecOps Integration
 
 ### SonarQube (SAST)
